@@ -148,13 +148,18 @@ function setSync(text, type) {
 
 // ======= 从云端读取数据 =======
 async function fetchData() {
-  const readUrl = `https://raw.githubusercontent.com/${GIT_OWNER}/${GIT_REPO}/${GIT_BRANCH}/data.json?_t=${Date.now()}`;
+  const infoUrl = `https://api.github.com/repos/${GIT_OWNER}/${GIT_REPO}/contents/data.json?_t=${Date.now()}`;
   try {
-    const r = await fetch(readUrl);
+    const r = await fetch(infoUrl, {
+      headers: { "Authorization": `Bearer ${GIT_TOKEN}`, "Accept": "application/vnd.github.v3+json" }
+    });
     if (!r.ok) throw new Error('HTTP ' + r.status);
-    const data = await r.json();
+    const info = await r.json();
+    const jsonStr = decodeURIComponent(escape(atob(info.content)));
+    const data = JSON.parse(jsonStr);
     people = data.people || 0;
     expenses = data.expenses || [];
+    lastSha = info.sha;
     setSync('✅ 数据已同步', 'ok');
     render();
   } catch(e) {
