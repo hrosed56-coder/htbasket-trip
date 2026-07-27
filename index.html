@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>滹沱篮球小组 · 自驾游费用记录</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: #f0f2f5;
+    color: #1a1a2e;
+    min-height: 100vh;
+  }
+  .header {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    color: #fff;
+    padding: 28px 20px 24px;
+    text-align: center;
+  }
+  .header h1 { font-size: 22px; letter-spacing: 2px; font-weight: 700; }
+  .header p { font-size: 13px; opacity: .7; margin-top: 6px; }
+  .container { max-width: 600px; margin: 0 auto; padding: 16px; }
+
+  .card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  }
+  .card-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* stats */
+  .stat-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+  }
+  .stat-item {
+    text-align: center;
+    padding: 14px 6px;
+    border-radius: 10px;
+    background: #f8fafc;
+  }
+  .stat-item .num {
+    font-size: 24px;
+    font-weight: 700;
+    color: #0f3460;
+  }
+  .stat-item .label {
+    font-size: 12px;
+    color: #64748b;
+    margin-top: 2px;
+  }
+
+  /* form */
+  .form-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+  .form-row:last-child { margin-bottom: 0; }
+  .form-row input {
+    flex: 1;
+    min-width: 120px;
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 14px;
+    outline: none;
+    transition: border .2s;
+  }
+  .form-row input:focus { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,.12); }
+
+  .people-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .people-input-wrap input {
+    width: 100px;
+    text-align: center;
+    font-size: 18px;
+    font-weight: 600;
+    padding: 8px 6px;
+  }
+
+  .btn {
+    padding: 10px 18px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all .2s;
+    white-space: nowrap;
+  }
+  .btn-primary { background: #4f46e5; color: #fff; }
+  .btn-primary:hover { background: #4338ca; }
+  .btn-danger { background: #fee2e2; color: #dc2626; }
+  .btn-danger:hover { background: #fecaca; }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+  .btn-block { width: 100%; }
+
+  /* expense list */
+  .expense-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .expense-item:last-child { border-bottom: none; }
+  .expense-info { flex: 1; }
+  .expense-desc { font-weight: 500; font-size: 14px; }
+  .expense-meta { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+  .expense-amount {
+    font-size: 16px;
+    font-weight: 700;
+    color: #0f3460;
+    text-align: right;
+    min-width: 70px;
+  }
+  .expense-actions { margin-left: 10px; }
+  .empty-state {
+    text-align: center;
+    padding: 24px 0;
+    color: #94a3b8;
+    font-size: 14px;
+  }
+
+  @media (max-width: 480px) {
+    .stat-row { grid-template-columns: 1fr; }
+    .people-input-wrap { flex-wrap: wrap; }
+  }
+
+  .tip {
+    background: #fffbeb;
+    border-left: 3px solid #f59e0b;
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    color: #92400e;
+    margin-bottom: 12px;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🏀 滹沱篮球小组 · 费用记录</h1>
+  <p>记录此次自驾游的花销，自动计算人均费用</p>
+</div>
+
+<div class="container">
+
+  <!-- 总人数设定 -->
+  <div class="card">
+    <div class="card-title">👥 参与人数</div>
+    <div class="people-input-wrap">
+      <input type="number" id="peopleInput" value="0" min="1" step="1">
+      <span style="font-size:14px;color:#64748b;">人</span>
+      <button class="btn btn-primary" onclick="setPeople()">确认</button>
+    </div>
+    <div style="font-size:13px;color:#64748b;margin-top:8px;" id="peopleStatus">请填写自驾游总人数</div>
+  </div>
+
+  <!-- 统计 -->
+  <div class="card">
+    <div class="stat-row">
+      <div class="stat-item">
+        <div class="num" id="totalDisplay">0.00</div>
+        <div class="label">总花费 (元)</div>
+      </div>
+      <div class="stat-item">
+        <div class="num" id="perPersonDisplay">0.00</div>
+        <div class="label">人均 (元)</div>
+      </div>
+      <div class="stat-item">
+        <div class="num" id="countDisplay">0</div>
+        <div class="label">笔数</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 添加费用 -->
+  <div class="card">
+    <div class="card-title">💸 添加一笔支出</div>
+    <div class="form-row">
+      <input type="text" id="descInput" placeholder="用途（如：加油、吃饭）" maxlength="30">
+    </div>
+    <div class="form-row">
+      <input type="number" id="amountInput" placeholder="金额 (元)" min="0.01" step="0.01">
+    </div>
+    <div class="form-row">
+      <button class="btn btn-primary btn-block" onclick="addExpense()">✅ 记录</button>
+    </div>
+  </div>
+
+  <!-- 费用列表 -->
+  <div class="card">
+    <div class="card-title">
+      📋 已记录支出
+      <button class="btn btn-danger btn-sm" onclick="clearAll()" style="margin-left:auto">清空全部</button>
+    </div>
+    <div id="expenseList"><div class="empty-state">还没有记录，在上方添加第一笔</div></div>
+  </div>
+
+  <div style="text-align:center;padding:12px 0 24px;color:#94a3b8;font-size:12px;">
+    数据保存在本地浏览器，关闭页面不会丢失
+  </div>
+</div>
+
+<script>
+let state = { people: 0, expenses: [] };
+
+function load() {
+  try {
+    const raw = localStorage.getItem('htbasket');
+    if (raw) state = JSON.parse(raw);
+  } catch(e) {}
+  if (!state.expenses) state.expenses = [];
+}
+function save() { localStorage.setItem('htbasket', JSON.stringify(state)); }
+
+function setPeople() {
+  const n = parseInt(document.getElementById('peopleInput').value);
+  if (!n || n < 1) { alert('请输入有效人数'); return; }
+  state.people = n;
+  save();
+  render();
+}
+
+function addExpense() {
+  const desc = document.getElementById('descInput').value.trim();
+  const amount = parseFloat(document.getElementById('amountInput').value);
+  if (!desc) { alert('请填写用途'); return; }
+  if (!amount || amount <= 0) { alert('请填写有效金额'); return; }
+  state.expenses.push({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    desc,
+    amount: Math.round(amount * 100) / 100,
+    time: new Date().toLocaleString('zh-CN', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' })
+  });
+  document.getElementById('descInput').value = '';
+  document.getElementById('amountInput').value = '';
+  save();
+  render();
+}
+
+function removeExpense(id) {
+  state.expenses = state.expenses.filter(e => e.id !== id);
+  save();
+  render();
+}
+
+function clearAll() {
+  if (state.expenses.length === 0) return;
+  if (!confirm('确定清空所有费用记录？')) return;
+  state.expenses = [];
+  save();
+  render();
+}
+
+function render() {
+  // people
+  document.getElementById('peopleInput').value = state.people || 0;
+  document.getElementById('peopleStatus').textContent = state.people
+    ? `✅ 共 ${state.people} 人参与，所有费用平摊`
+    : '请填写自驾游总人数';
+
+  // stats
+  const total = state.expenses.reduce((s, e) => s + e.amount, 0);
+  const count = state.expenses.length;
+  const perPerson = state.people > 0 ? total / state.people : 0;
+  document.getElementById('totalDisplay').textContent = total.toFixed(2);
+  document.getElementById('perPersonDisplay').textContent = perPerson.toFixed(2);
+  document.getElementById('countDisplay').textContent = count;
+
+  // expense list
+  const el = document.getElementById('expenseList');
+  if (count === 0) {
+    el.innerHTML = '<div class="empty-state">还没有记录，在上方添加第一笔</div>';
+    return;
+  }
+  el.innerHTML = [...state.expenses].reverse().map(e =>
+    `<div class="expense-item">
+      <div class="expense-info">
+        <div class="expense-desc">${esc(e.desc)}</div>
+        <div class="expense-meta">${e.time || ''}</div>
+      </div>
+      <div class="expense-amount">¥${e.amount.toFixed(2)}</div>
+      <div class="expense-actions">
+        <button class="btn btn-danger btn-sm" onclick="removeExpense('${e.id}')">✕</button>
+      </div>
+    </div>`
+  ).join('');
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+load();
+render();
+</script>
+</body>
+</html>
