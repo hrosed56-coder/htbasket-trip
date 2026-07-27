@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>滹沱篮球小组 · 自驾游费用记录</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
+</script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -21,7 +23,6 @@
   .header h1 { font-size: 22px; letter-spacing: 2px; font-weight: 700; }
   .header p { font-size: 13px; opacity: .7; margin-top: 6px; }
   .container { max-width: 600px; margin: 0 auto; padding: 16px; }
-
   .card {
     background: #fff;
     border-radius: 12px;
@@ -37,8 +38,6 @@
     align-items: center;
     gap: 8px;
   }
-
-  /* stats */
   .stat-row {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
@@ -50,18 +49,8 @@
     border-radius: 10px;
     background: #f8fafc;
   }
-  .stat-item .num {
-    font-size: 24px;
-    font-weight: 700;
-    color: #0f3460;
-  }
-  .stat-item .label {
-    font-size: 12px;
-    color: #64748b;
-    margin-top: 2px;
-  }
-
-  /* form */
+  .stat-item .num { font-size: 24px; font-weight: 700; color: #0f3460; }
+  .stat-item .label { font-size: 12px; color: #64748b; margin-top: 2px; }
   .form-row {
     display: flex;
     gap: 10px;
@@ -77,10 +66,8 @@
     border-radius: 8px;
     font-size: 14px;
     outline: none;
-    transition: border .2s;
   }
   .form-row input:focus { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,.12); }
-
   .people-input-wrap {
     display: flex;
     align-items: center;
@@ -93,7 +80,6 @@
     font-weight: 600;
     padding: 8px 6px;
   }
-
   .btn {
     padding: 10px 18px;
     border: none;
@@ -101,7 +87,6 @@
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
-    transition: all .2s;
     white-space: nowrap;
   }
   .btn-primary { background: #4f46e5; color: #fff; }
@@ -110,8 +95,6 @@
   .btn-danger:hover { background: #fecaca; }
   .btn-sm { padding: 6px 12px; font-size: 12px; }
   .btn-block { width: 100%; }
-
-  /* expense list */
   .expense-item {
     display: flex;
     justify-content: space-between;
@@ -123,35 +106,22 @@
   .expense-info { flex: 1; }
   .expense-desc { font-weight: 500; font-size: 14px; }
   .expense-meta { font-size: 12px; color: #94a3b8; margin-top: 2px; }
-  .expense-amount {
-    font-size: 16px;
-    font-weight: 700;
-    color: #0f3460;
-    text-align: right;
-    min-width: 70px;
-  }
+  .expense-amount { font-size: 16px; font-weight: 700; color: #0f3460; text-align: right; min-width: 70px; }
   .expense-actions { margin-left: 10px; }
-  .empty-state {
-    text-align: center;
-    padding: 24px 0;
-    color: #94a3b8;
-    font-size: 14px;
-  }
-
+  .empty-state { text-align: center; padding: 24px 0; color: #94a3b8; font-size: 14px; }
   @media (max-width: 480px) {
     .stat-row { grid-template-columns: 1fr; }
     .people-input-wrap { flex-wrap: wrap; }
   }
-
-  .tip {
-    background: #fffbeb;
-    border-left: 3px solid #f59e0b;
-    padding: 10px 14px;
-    border-radius: 6px;
-    font-size: 13px;
-    color: #92400e;
-    margin-bottom: 12px;
+  .sync-status {
+    font-size: 12px;
+    color: #64748b;
+    text-align: center;
+    margin-top: 4px;
   }
+  .sync-ok { color: #16a34a; }
+  .sync-err { color: #dc2626; }
+  .sync-loading { color: #ca8a04; }
 </style>
 </head>
 <body>
@@ -190,6 +160,7 @@
         <div class="label">笔数</div>
       </div>
     </div>
+    <div class="sync-status" id="syncStatus">☁️ 正在连接服务器...</div>
   </div>
 
   <!-- 添加费用 -->
@@ -212,93 +183,239 @@
       📋 已记录支出
       <button class="btn btn-danger btn-sm" onclick="clearAll()" style="margin-left:auto">清空全部</button>
     </div>
-    <div id="expenseList"><div class="empty-state">还没有记录，在上方添加第一笔</div></div>
+    <div id="expenseList"><div class="empty-state">加载中...</div></div>
   </div>
 
   <div style="text-align:center;padding:12px 0 24px;color:#94a3b8;font-size:12px;">
-    数据保存在本地浏览器，关闭页面不会丢失
+    数据存放在云端，所有设备同步
   </div>
 </div>
 
 <script>
-let state = { people: 0, expenses: [] };
+// Supabase 配置
+const SUPABASE_URL = 'https://djrezxbsdqrjiufqmale.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqcmV6eGJzZHFyaml1ZnFtYWxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyNTc0NzcsImV4cCI6MjA3MDgzMzQ3N30.7O14_ui33n4b8_9hSB7pJldBmflG3R3Fn5htLYBONtw';
 
-function load() {
-  try {
-    const raw = localStorage.getItem('htbasket');
-    if (raw) state = JSON.parse(raw);
-  } catch(e) {}
-  if (!state.expenses) state.expenses = [];
+let supabase = null;
+let people = 0;
+let expenses = [];
+
+function setSyncStatus(text, type) {
+  const el = document.getElementById('syncStatus');
+  el.textContent = text;
+  el.className = 'sync-status' + (type ? ' sync-' + type : '');
 }
-function save() { localStorage.setItem('htbasket', JSON.stringify(state)); }
 
-function setPeople() {
-  const n = parseInt(document.getElementById('peopleInput').value);
-  if (!n || n < 1) { alert('请输入有效人数'); return; }
-  state.people = n;
-  save();
+async function initSupabase() {
+  try {
+    if (typeof supabaseClient !== 'undefined') {
+      supabase = supabaseClient.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      setSyncStatus('☁️ 正在连接服务器...', 'loading');
+      
+      // Test connection
+      const { data, error } = await supabase.from('expenses').select('*');
+      if (error) {
+        console.error('Supabase error:', error);
+        setSyncStatus('❌ 连接失败，使用本地存储', 'err');
+        // Fall back to localStorage
+        loadLocal();
+        return;
+      }
+      
+      setSyncStatus('✅ 云端已连接', 'ok');
+      await loadFromSupabase();
+      
+      // Auto-refresh every 10 seconds
+      setInterval(loadFromSupabase, 10000);
+    } else {
+      throw new Error('Supabase JS not loaded');
+    }
+  } catch(e) {
+    console.error('Init error:', e);
+    setSyncStatus('⚠️ 使用本地存储', 'err');
+    loadLocal();
+  }
+}
+
+async function loadFromSupabase() {
+  if (!supabase) return;
+  
+  // Load people count
+  const { data: meta, error: metaErr } = await supabase
+    .from('expenses')
+    .select('people_count')
+    .eq('id', 1)
+    .single();
+  
+  if (!metaErr && meta) {
+    people = meta.people_count || 0;
+  }
+  
+  // Load expenses (exclude the metadata row with id=1)
+  const { data: items, error: itemsErr } = await supabase
+    .from('expenses')
+    .select('*')
+    .gt('id', 1)
+    .order('created_at', { ascending: false });
+  
+  if (!itemsErr && items) {
+    expenses = items.map(item => ({
+      id: String(item.id),
+      desc: item.description,
+      amount: Number(item.amount),
+      time: new Date(item.created_at).toLocaleString('zh-CN', {
+        month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'
+      })
+    }));
+  }
+  
   render();
 }
 
-function addExpense() {
+async function setPeople() {
+  const n = parseInt(document.getElementById('peopleInput').value);
+  if (!n || n < 1) { alert('请输入有效人数'); return; }
+  
+  if (supabase) {
+    setSyncStatus('☁️ 保存中...', 'loading');
+    const { error } = await supabase
+      .from('expenses')
+      .upsert({ id: 1, people_count: n, description: '_meta', amount: 0 }, 
+        { onConflict: 'id' });
+    if (error) {
+      setSyncStatus('❌ 保存失败', 'err');
+      return;
+    }
+  }
+  
+  people = n;
+  setSyncStatus('✅ 已保存', 'ok');
+  render();
+}
+
+async function addExpense() {
   const desc = document.getElementById('descInput').value.trim();
   const amount = parseFloat(document.getElementById('amountInput').value);
   if (!desc) { alert('请填写用途'); return; }
   if (!amount || amount <= 0) { alert('请填写有效金额'); return; }
-  state.expenses.push({
-    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-    desc,
-    amount: Math.round(amount * 100) / 100,
-    time: new Date().toLocaleString('zh-CN', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' })
-  });
+  
+  const rounded = Math.round(amount * 100) / 100;
+  
+  if (supabase) {
+    setSyncStatus('☁️ 保存中...', 'loading');
+    const { error } = await supabase
+      .from('expenses')
+      .insert({ description: desc, amount: rounded, people_count: 0 });
+    
+    if (error) {
+      setSyncStatus('❌ 保存失败: ' + error.message, 'err');
+      return;
+    }
+    setSyncStatus('✅ 已保存', 'ok');
+    await loadFromSupabase();
+  } else {
+    expenses.unshift({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      desc,
+      amount: rounded,
+      time: new Date().toLocaleString('zh-CN', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' })
+    });
+    saveLocal();
+    render();
+  }
+  
   document.getElementById('descInput').value = '';
   document.getElementById('amountInput').value = '';
-  save();
-  render();
 }
 
-function removeExpense(id) {
-  state.expenses = state.expenses.filter(e => e.id !== id);
-  save();
-  render();
+async function removeExpense(id) {
+  if (supabase) {
+    setSyncStatus('☁️ 删除中...', 'loading');
+    const { error } = await supabase
+      .from('expenses')
+      .delete()
+      .eq('id', parseInt(id));
+    
+    if (error) {
+      setSyncStatus('❌ 删除失败', 'err');
+      return;
+    }
+    setSyncStatus('✅ 已删除', 'ok');
+    await loadFromSupabase();
+  } else {
+    expenses = expenses.filter(e => e.id !== id);
+    saveLocal();
+    render();
+  }
 }
 
-function clearAll() {
-  if (state.expenses.length === 0) return;
+async function clearAll() {
+  if (expenses.length === 0) return;
   if (!confirm('确定清空所有费用记录？')) return;
-  state.expenses = [];
-  save();
+  
+  if (supabase) {
+    setSyncStatus('☁️ 清空中...', 'loading');
+    const { error } = await supabase
+      .from('expenses')
+      .delete()
+      .gt('id', 1); // delete all except meta row
+    
+    if (error) {
+      setSyncStatus('❌ 清空失败', 'err');
+      return;
+    }
+    setSyncStatus('✅ 已清空', 'ok');
+    await loadFromSupabase();
+  } else {
+    expenses = [];
+    saveLocal();
+    render();
+  }
+}
+
+// Local storage fallback
+function loadLocal() {
+  try {
+    const raw = localStorage.getItem('htbasket');
+    if (raw) {
+      const d = JSON.parse(raw);
+      people = d.people || 0;
+      expenses = d.expenses || [];
+    }
+  } catch(e) {}
   render();
+}
+
+function saveLocal() {
+  localStorage.setItem('htbasket', JSON.stringify({ people, expenses }));
 }
 
 function render() {
-  // people
-  document.getElementById('peopleInput').value = state.people || 0;
-  document.getElementById('peopleStatus').textContent = state.people
-    ? `✅ 共 ${state.people} 人参与，所有费用平摊`
+  document.getElementById('peopleInput').value = people || 0;
+  document.getElementById('peopleStatus').textContent = people
+    ? `✅ 共 ${people} 人参与，所有费用平摊`
     : '请填写自驾游总人数';
-
-  // stats
-  const total = state.expenses.reduce((s, e) => s + e.amount, 0);
-  const count = state.expenses.length;
-  const perPerson = state.people > 0 ? total / state.people : 0;
+  
+  const total = expenses.reduce((s, e) => s + e.amount, 0);
+  const count = expenses.length;
+  const perPerson = people > 0 ? total / people : 0;
+  
   document.getElementById('totalDisplay').textContent = total.toFixed(2);
   document.getElementById('perPersonDisplay').textContent = perPerson.toFixed(2);
   document.getElementById('countDisplay').textContent = count;
-
-  // expense list
+  
   const el = document.getElementById('expenseList');
   if (count === 0) {
     el.innerHTML = '<div class="empty-state">还没有记录，在上方添加第一笔</div>';
     return;
   }
-  el.innerHTML = [...state.expenses].reverse().map(e =>
+  el.innerHTML = expenses.map(e =>
     `<div class="expense-item">
       <div class="expense-info">
         <div class="expense-desc">${esc(e.desc)}</div>
         <div class="expense-meta">${e.time || ''}</div>
       </div>
-      <div class="expense-amount">¥${e.amount.toFixed(2)}</div>
+      <div class="expense-amount">¥${Number(e.amount).toFixed(2)}</div>
       <div class="expense-actions">
         <button class="btn btn-danger btn-sm" onclick="removeExpense('${e.id}')">✕</button>
       </div>
@@ -312,8 +429,8 @@ function esc(s) {
   return d.innerHTML;
 }
 
-load();
-render();
+// Start
+initSupabase();
 </script>
 </body>
 </html>
