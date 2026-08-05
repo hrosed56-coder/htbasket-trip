@@ -83,12 +83,7 @@
 
   <div class="card">
     <div class="card-title">👥 参与人数</div>
-    <div class="people-input-wrap">
-      <input type="number" id="peopleInput" value="0" min="1" step="1">
-      <span style="font-size:14px;color:#64748b;">人</span>
-      <button class="btn btn-primary" onclick="setPeople()">确认</button>
-    </div>
-    <div style="font-size:13px;color:#64748b;margin-top:8px;" id="peopleStatus">填写人数后点击确认</div>
+    <div style="font-size:22px;font-weight:700;color:#0f3460;" id="peopleStatus">共 8 人参与 · 所有费用平摊</div>
   </div>
 
   <div class="card">
@@ -134,7 +129,8 @@ const GIT_BRANCH = "main";
 const GIT_TOKEN = ["ghp", "ZIWH76XlazcQHmQrCRMKN1RqfBskIT32M5bu"].join("_");
 
 // ======= 状态 =======
-let people = 0;
+const FIXED_PEOPLE = 8; // 固定人数，不可修改
+let people = FIXED_PEOPLE;
 let expenses = [];
 let lastSha = null;
 let isSaving = false;
@@ -157,7 +153,7 @@ async function fetchData() {
     const info = await r.json();
     const jsonStr = decodeURIComponent(escape(atob(info.content)));
     const data = JSON.parse(jsonStr);
-    people = data.people || 0;
+    people = FIXED_PEOPLE; // 人数固定为 8，不读取云端
     expenses = data.expenses || [];
     lastSha = info.sha;
     setSync('✅ 数据已同步', 'ok');
@@ -232,7 +228,7 @@ function loadLocal() {
     const raw = localStorage.getItem('htb_cloud');
     if (raw) {
       const d = JSON.parse(raw);
-      people = d.people || 0;
+      people = FIXED_PEOPLE; // 人数固定为 8
       expenses = d.expenses || [];
     }
   } catch(e) {}
@@ -243,15 +239,6 @@ function saveLocal() {
 }
 
 // ======= 操作函数 =======
-async function setPeople() {
-  const n = parseInt(document.getElementById('peopleInput').value);
-  if (!n || n < 1) { alert('请输入有效人数'); return; }
-  people = n;
-  saveLocal();
-  render();
-  await saveToCloud();
-}
-
 async function addExpense() {
   const desc = document.getElementById('descInput').value.trim();
   const amount = parseFloat(document.getElementById('amountInput').value);
@@ -283,17 +270,14 @@ async function clearAll() {
   if (expenses.length === 0) return;
   if (!confirm('确定清空所有费用记录？')) return;
   expenses = [];
-  people = 0;
+  // 人数保持固定 8 人，不重置
   saveLocal();
   render();
   await saveToCloud();
 }
 
 function render() {
-  document.getElementById('peopleInput').value = people || 0;
-  document.getElementById('peopleStatus').textContent = people
-    ? `✅ 共 ${people} 人参与，所有费用平摊`
-    : '请填写自驾游总人数';
+  document.getElementById('peopleStatus').textContent = `共 ${people} 人参与 · 所有费用平摊`;
   
   const total = expenses.reduce((s, e) => s + e.amount, 0);
   const count = expenses.length;
